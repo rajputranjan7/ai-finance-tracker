@@ -51,6 +51,14 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function safeCSV(value: string | number): string {
+  const str = String(value);
+  if (/^[=+\-@]/.test(str)) {
+    return `'${str}`;
+  }
+  return str;
+}
+
 export default function ExpenseTable({
   expenses,
   loading,
@@ -76,7 +84,7 @@ export default function ExpenseTable({
     if (!expenses.length) return;
     const headers = ["Description,Category,Amount(INR),Date\n"];
     const rows = expenses.map(
-      (e) => `"${e.description.replace(/"/g, '""')}",${e.category},${e.amount},${e.expense_date}`
+      (e) => `"${safeCSV(e.description.replace(/"/g, '""'))}",${e.category},${e.amount},${e.expense_date}`
     );
     const blob = new Blob([headers + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

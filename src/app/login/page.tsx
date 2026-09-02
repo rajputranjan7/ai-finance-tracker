@@ -29,7 +29,7 @@ export default function LoginPage() {
         });
         if (error) throw error;
         setSuccess(
-          "Account created! Check your email for verification, or log in directly if email confirmation is disabled."
+          "Account created successfully! Check your email for verification."
         );
         setIsSignUp(false);
       } else {
@@ -42,8 +42,13 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Something went wrong";
-      setError(message);
+      if (isSignUp) {
+        const message = err instanceof Error ? err.message : "Failed to create account.";
+        setError(message);
+      } else {
+        // Generic security error message to avoid account enumeration
+        setError("Invalid email or password. Please check your credentials.");
+      }
     } finally {
       setLoading(false);
     }
@@ -98,7 +103,7 @@ export default function LoginPage() {
 
           <div className="form-group">
             <label className="form-label" htmlFor="password">
-              Password
+              Password (min. 8 characters)
             </label>
             <div className="form-input-with-icon">
               <Lock size={16} className="form-input-icon" />
@@ -110,7 +115,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
               />
             </div>
           </div>
