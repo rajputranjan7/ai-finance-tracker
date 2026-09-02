@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { categorizeExpense } from '@/lib/ai-categorizer';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { categorizeRequestSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   try {
@@ -28,21 +29,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Input validation
-    const { description } = await request.json();
+    // 3. Zod Input Validation
+    const body = await request.json();
+    const validationResult = categorizeRequestSchema.safeParse(body);
 
-    if (
-      !description ||
-      typeof description !== 'string' ||
-      description.trim().length === 0 ||
-      description.length > 500
-    ) {
-      return NextResponse.json(
-        { error: 'Invalid description. Must be between 1 and 500 characters.' },
-        { status: 400 }
-      );
+    if (!validationResult.success) {
+      const firstError = validationResult.error.issues[0]?.message || 'Invalid request';
+      return NextResponse.json({ error: firstError }, { status: 400 });
     }
 
+    const { description } = validationResult.data;
     const category = categorizeExpense(description);
 
     return NextResponse.json({ category });

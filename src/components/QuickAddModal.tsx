@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { X, Sparkles, Plus, DollarSign, Calendar, FileText } from "lucide-react";
+import { X, Sparkles, Plus, DollarSign, Calendar, FileText, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORIES } from "@/lib/ai-categorizer";
+import { expenseSchema } from "@/lib/validation";
 
 interface QuickAddModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export default function QuickAddModal({
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [aiSuggesting, setAiSuggesting] = useState(false);
   const supabase = createClient();
@@ -40,7 +42,7 @@ export default function QuickAddModal({
         setCategory(data.category);
       }
     } catch {
-      // Silently continue
+      // Continue
     } finally {
       setAiSuggesting(false);
     }
@@ -48,24 +50,44 @@ export default function QuickAddModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !description.trim()) return;
+    setErrorMsg("");
+
+    const parsedAmount = parseFloat(amount);
+    const finalCategory = category || "Other";
+
+    // Zod validation
+    const validation = expenseSchema.safeParse({
+      amount: parsedAmount,
+      description: description.trim(),
+      category: finalCategory,
+      expense_date: date,
+    });
+
+    if (!validation.success) {
+      const msg = validation.error.issues[0]?.message || "Invalid input";
+      setErrorMsg(msg);
+      return;
+    }
+
     setLoading(true);
 
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
 
-      const finalCategory = category || "Other";
+      if (!user) {
+        setErrorMsg("User not authenticated.");
+        return;
+      }
 
       const { error } = await supabase.from("expenses").insert({
         user_id: user.id,
-        amount: parseFloat(amount),
-        description: description.trim(),
-        category: finalCategory,
-        ai_category: finalCategory,
-        expense_date: date,
+        amount: validation.data.amount,
+        description: validation.data.description,
+        category: validation.data.category,
+        ai_category: validation.data.category,
+        expense_date: validation.data.expense_date,
       });
 
       if (error) throw error;
@@ -76,8 +98,9 @@ export default function QuickAddModal({
       setCategory("");
       onExpenseAdded();
       onClose();
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to add expense";
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -123,6 +146,12 @@ export default function QuickAddModal({
             <X size={18} />
           </button>
         </div>
+
+        {errorMsg && (
+          <div className="auth-error" style={{ marginBottom: 14 }}>
+            <AlertCircle size={15} /> {errorMsg}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

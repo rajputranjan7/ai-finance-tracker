@@ -25,7 +25,7 @@ const CATEGORY_KEYWORDS: Record<Category, string[]> = {
   'Food & Dining': [
     'restaurant', 'cafe', 'coffee', 'starbucks', 'mcdonalds', 'burger',
     'pizza', 'sushi', 'lunch', 'dinner', 'breakfast', 'brunch', 'takeout',
-    'doordash', 'ubereats', 'grubhub', 'food delivery', 'dine', 'eat',
+    'doordash', 'ubereats', 'uber eats', 'grubhub', 'food delivery', 'pizza delivery', 'dine', 'eat',
     'snack', 'bakery', 'deli', 'bar', 'pub', 'kfc', 'subway', 'chipotle',
     'dominos', 'taco', 'noodle', 'ramen', 'thai', 'chinese', 'indian',
     'italian', 'mexican', 'wing', 'fries', 'meal', 'zomato', 'swiggy',

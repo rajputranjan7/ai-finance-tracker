@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CATEGORIES } from "@/lib/ai-categorizer";
+import { expenseSchema } from "@/lib/validation";
 import {
   DollarSign,
   FileText,
   Calendar,
   Sparkles,
   Plus,
+  AlertCircle,
 } from "lucide-react";
 
 interface ExpenseFormProps {
@@ -22,6 +24,7 @@ export default function ExpenseForm({ onExpenseAdded }: ExpenseFormProps) {
   const [date, setDate] = useState(
     new Date().toISOString().split("T")[0]
   );
+  const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [aiSuggesting, setAiSuggesting] = useState(false);
   const supabase = createClient();
@@ -40,7 +43,7 @@ export default function ExpenseForm({ onExpenseAdded }: ExpenseFormProps) {
         setCategory(data.category);
       }
     } catch {
-      // Silently fail — user can still pick a category manually
+      // Continue
     } finally {
       setAiSuggesting(false);
     }
@@ -48,7 +51,25 @@ export default function ExpenseForm({ onExpenseAdded }: ExpenseFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !description.trim()) return;
+    setErrorMsg("");
+
+    const parsedAmount = parseFloat(amount);
+    const finalCategory = category || "Other";
+
+    // Zod validation
+    const validation = expenseSchema.safeParse({
+      amount: parsedAmount,
+      description: description.trim(),
+      category: finalCategory,
+      expense_date: date,
+    });
+
+    if (!validation.success) {
+      const msg = validation.error.issues[0]?.message || "Invalid input";
+      setErrorMsg(msg);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -56,29 +77,31 @@ export default function ExpenseForm({ onExpenseAdded }: ExpenseFormProps) {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user) return;
-
-      const finalCategory = category || "Other";
+      if (!user) {
+        setErrorMsg("User not authenticated.");
+        return;
+      }
 
       const { error } = await supabase.from("expenses").insert({
         user_id: user.id,
-        amount: parseFloat(amount),
-        description: description.trim(),
-        category: finalCategory,
-        ai_category: finalCategory,
-        expense_date: date,
+        amount: validation.data.amount,
+        description: validation.data.description,
+        category: validation.data.category,
+        ai_category: validation.data.category,
+        expense_date: validation.data.expense_date,
       });
 
       if (error) throw error;
 
-      // Reset form
+      // Reset
       setAmount("");
       setDescription("");
       setCategory("");
       setDate(new Date().toISOString().split("T")[0]);
       onExpenseAdded();
-    } catch (err) {
-      console.error("Failed to add expense:", err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to add expense";
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -96,6 +119,12 @@ export default function ExpenseForm({ onExpenseAdded }: ExpenseFormProps) {
           AI Enabled
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="auth-error" style={{ marginBottom: 14 }}>
+          <AlertCircle size={15} /> {errorMsg}
+        </div>
+      )}
 
       <form className="expense-form" onSubmit={handleSubmit}>
         <div className="expense-form-row">
@@ -161,14 +190,12 @@ export default function ExpenseForm({ onExpenseAdded }: ExpenseFormProps) {
             Category
             {aiSuggesting && (
               <span className="ai-badge" style={{ marginLeft: 8 }}>
-                <div className="loading-spinner" style={{ width: 10, height: 10 }} />
-                Analyzing...
+                Categorizing...
               </span>
             )}
             {category && !aiSuggesting && (
               <span className="ai-badge" style={{ marginLeft: 8 }}>
-                <Sparkles size={10} />
-                AI Suggested
+                <Sparkles size={10} /> AI Suggested
               </span>
             )}
           </label>
@@ -197,8 +224,7 @@ export default function ExpenseForm({ onExpenseAdded }: ExpenseFormProps) {
             <div className="loading-spinner" />
           ) : (
             <>
-              <Plus size={16} />
-              Add Expense
+              <Plus size={16} /> Add Expense
             </>
           )}
         </button>
